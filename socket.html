@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload with Progress</title>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .upload-container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .file-input {
+            margin-bottom: 20px;
+        }
+        .progress {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="upload-container">
+    <h1>Upload Files</h1>
+    <input type="file" id="fileInput" multiple class="file-input">
+    <button onclick="uploadFiles()">Upload</button>
+
+    <div id="progressContainer" class="progress"></div>
+    <div id="resultContainer" class="progress"></div>
+</div>
+
+<script>
+    const socket = io('http://localhost:3000');
+    let socketId;
+
+    socket.on('connect', () => {
+        socketId = socket.id;
+        console.log('Connected to server with socket ID:', socketId);
+    });
+
+    socket.on('uploadProgress', (data) => {
+        const progressElement = document.getElementById(`${data.file}-progress`);
+        if (progressElement) {
+            progressElement.innerText = `File: ${data.file} - ${data.percentage}% uploaded`;
+        }
+    });
+
+    socket.on('uploadComplete', (data) => {
+        const resultContainer = document.getElementById('resultContainer');
+        resultContainer.innerHTML = '<h2>Upload Results</h2>';
+        data.data.forEach(file => {
+            if (file.status === 'success') {
+                resultContainer.innerHTML += `<p><a href="${file.location}" target="_blank">${file.file}</a> - Uploaded Successfully</p>`;
+            } else {
+                resultContainer.innerHTML += `<p>${file.file} - Upload Failed</p>`;
+            }
+        });
+    });
+
+    function uploadFiles() {
+        const fileInput = document.getElementById('fileInput');
+        const files = fileInput.files;
+        const progressContainer = document.getElementById('progressContainer');
+        progressContainer.innerHTML = '';
+
+        const formData = new FormData();
+        for (let i = 0; i < files.length; i++) {
+            formData.append('media_h', files[i]);
+            progressContainer.innerHTML += `<p id="${files[i].name}-progress">File: ${files[i].name} - 0% uploaded</p>`;
+        }
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/upload', true);
+        xhr.setRequestHeader('socket-id', socketId);
+
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                console.log('Upload started');
+            }
+        };
+
+        xhr.send(formData);
+    }
+</script>
+
+</body>
+</html>
